@@ -21,294 +21,289 @@ module.exports = function(ServerlessPlugin, serverlessPath) {
       this.S.addAction(this.serve.bind(this), {
         handler:       'serve',
         description:   `Exposes all lambdas as local HTTP, simulating API Gateway functionality`,
-      context:       'serve',
+        context:       'serve',
         contextAction: 'start',
         options:       [
-        {
-          option:      'init',
-          shortcut:    'i',
-          description: 'Optional - JS file to run as custom initialization code'
-        }, {
-          option:      'prefix',
-          shortcut:    'p',
-          description: 'Optional - add URL prefix to each lambda'
-        }, {
-          option:      'port',
-          shortcut:    'P',
-          description: 'Optional - HTTP port to use, default: 1465'
-        }
-      ]
-    });
-    return BbPromise.resolve();
-  }
-  registerHooks() {
-    return BbPromise.resolve();
-  }
-
-  _createApp() {
-    let _this = this;
-
-    this.app = express();
-
-    if( !this.evt.port ){
-      this.evt.port = 1465;
+          {
+            option:      'init',
+            shortcut:    'i',
+            description: 'Optional - JS file to run as custom initialization code'
+          }, {
+            option:      'prefix',
+            shortcut:    'p',
+            description: 'Optional - add URL prefix to each lambda'
+          }, {
+            option:      'port',
+            shortcut:    'P',
+            description: 'Optional - HTTP port to use, default: 1465'
+          }
+        ]
+      });
+      return BbPromise.resolve();
+    }
+    registerHooks() {
+      return BbPromise.resolve();
     }
 
-    if( !this.evt.prefix ){
-      this.evt.prefix = "";
-    }
+    _createApp() {
+      let _this = this;
 
-    if( (this.evt.prefix.length > 0) && (this.evt.prefix[this.evt.prefix.length-1] != '/') ) {
-      this.evt.prefix = this.evt.prefix + "/";
-    }
+      this.app = express();
 
-    this.app.get( '/__quit', function(req, res, next){
-      SCli.log('Quit request received, quitting.');
-      res.send({ok: true});
-      _this.server.close();
-    });
-
-    this.app.use( function(req, res, next) {
-      res.header('Access-Control-Allow-Origin', '*');
-      next();
-    });
-
-    this.app.use(bodyParser.json({ limit: '5mb' }));
-
-    this.app.use( function(req, res, next){
-      res.header( 'Access-Control-Allow-Methods', 'GET,PUT,HEAD,POST,DELETE,OPTIONS' );
-      res.header( 'Access-Control-Allow-Headers', 'Authorization,Content-Type,x-amz-date,x-amz-security-token' );
-
-      if( req.method != 'OPTIONS' ) {
-        next()
-      } else {
-        res.status(200).end()
+      if( !this.evt.port ){
+        this.evt.port = 1465;
       }
-    });
-  }
 
-  _tryInit() {
-    if( this.evt.init ){
-      let handler = require( path.join( process.cwd(), this.evt.init ) );
-      return( handler( this.S, this.app, this.handlers ) );
+      if( !this.evt.prefix ){
+        this.evt.prefix = "";
+      }
+
+      if( (this.evt.prefix.length > 0) && (this.evt.prefix[this.evt.prefix.length-1] != '/') ) {
+        this.evt.prefix = this.evt.prefix + "/";
+      }
+
+      this.app.get( '/__quit', function(req, res, next){
+        SCli.log('Quit request received, quitting.');
+        res.send({ok: true});
+        _this.server.close();
+      });
+
+      this.app.use( function(req, res, next) {
+        res.header('Access-Control-Allow-Origin', '*');
+        next();
+      });
+
+      this.app.use(bodyParser.json({ limit: '5mb' }));
+
+      this.app.use( function(req, res, next){
+        res.header( 'Access-Control-Allow-Methods', 'GET,PUT,HEAD,POST,DELETE,OPTIONS' );
+        res.header( 'Access-Control-Allow-Headers', 'Authorization,Content-Type,x-amz-date,x-amz-security-token' );
+
+        if( req.method != 'OPTIONS' ) {
+          next()
+        } else {
+          res.status(200).end()
+        }
+      });
     }
-  }
 
-  _registerLambdas() {
-    let _this = this;
-    let functions = this.S.state.getFunctions();
+    _tryInit() {
+      if( this.evt.init ){
+        let handler = require( path.join( process.cwd(), this.evt.init ) );
+        return( handler( this.S, this.app, this.handlers ) );
+      }
+    }
 
-    _this.handlers = {};
+    _registerLambdas() {
+      let _this = this;
+      let functions = this.S.state.getFunctions();
 
-    return functions.forEach(function(fun) {
-      /*
-       _config:
-       { component: 'node',
-       module: 'homepage',
-       function: 'index',
-       sPath: 'node/homepage/index',
-       fullPath: '/path/to/some/serverless/project/node/homepage/index' },
-       name: 'index',
-       handler: 'homepage/index/handler.handler',
-       runtime: 'nodejs',
-       timeout: 6,
-       memorySize: 1024,
-       custom: { excludePatterns: [], envVars: [] },
-       endpoints:
-       [ ServerlessEndpoint {
-       _S: [Object],
-       _config: [Object],
-       path: 'homepage/index',
-       method: 'GET',
-       authorizationType: 'none',
-       apiKeyRequired: false,
-       requestParameters: {},
-       requestTemplates: [Object],
-       responses: [Object] } ] }
-       */
+      _this.handlers = {};
 
-      if( fun.runtime == 'nodejs' ) {
-        let handlerParts = fun.handler.split('/').pop().split('.');
-        let handlerPath = path.join(fun._config.fullPath, handlerParts[0] + '.js');
-        let handler;
+      return functions.forEach(function(fun) {
+        /*
+         _config:
+         { component: 'node',
+         module: 'homepage',
+         function: 'index',
+         sPath: 'node/homepage/index',
+         fullPath: '/path/to/some/serverless/project/node/homepage/index' },
+         name: 'index',
+         handler: 'homepage/index/handler.handler',
+         runtime: 'nodejs',
+         timeout: 6,
+         memorySize: 1024,
+         custom: { excludePatterns: [], envVars: [] },
+         endpoints:
+         [ ServerlessEndpoint {
+         _S: [Object],
+         _config: [Object],
+         path: 'homepage/index',
+         method: 'GET',
+         authorizationType: 'none',
+         apiKeyRequired: false,
+         requestParameters: {},
+         requestTemplates: [Object],
+         responses: [Object] } ] }
+         */
 
-        _this.handlers[ fun.handler ] = {
-          path: handlerPath,
-          handler: handlerParts[ 1 ],
-          definition: fun
-        };
+        if( fun.runtime == 'nodejs' ) {
+          let handlerParts = fun.handler.split('/').pop().split('.');
+          let handlerPath = path.join(fun._config.fullPath, handlerParts[0] + '.js');
+          let handler;
 
-        fun.endpoints.forEach(function(endpoint){
-          let epath = endpoint.path;
-          let cfPath = _this.evt.prefix + epath;
+          _this.handlers[ fun.handler ] = {
+            path: handlerPath,
+            handler: handlerParts[ 1 ],
+            definition: fun
+          };
 
-          if( cfPath[ 0 ] != '/' ) {
-            cfPath = '/' + cfPath;
-          }
+          fun.endpoints.forEach(function(endpoint){
+            let epath = endpoint.path;
+            let cfPath = _this.evt.prefix + epath;
 
-          // In worst case we have two slashes at the end (one from prefix, one from "/" lambda mount point)
-          while( (cfPath.length > 1) && (cfPath[ cfPath.length - 1 ] == '/') ){
-            cfPath = cfPath.substr( cfPath.length - 1 );
-          }
-
-          let cfPathParts = cfPath.split( '/' );
-          cfPathParts = cfPathParts.map(function(part){
-            if( part.length > 0 ) {
-              if( (part[ 0 ] == '{') && (part[ part.length - 1 ] == '}') ) {
-                return( ":" + part.substr( 1, part.length - 2 ) );
-              }
+            if( cfPath[ 0 ] != '/' ) {
+              cfPath = '/' + cfPath;
             }
-            return( part );
-          });
-          if( process.env.DEBUG ) {
-            SCli.log( "Route: " + endpoint.method + " " + cfPath );
-          }
 
-          _this.app[ endpoint.method.toLocaleLowerCase() ]( cfPathParts.join('/'), function(req, res, next){
-            SCli.log("Serving: " + endpoint.method + " " + cfPath);
-            let result = new BbPromise(function(resolve, reject) {
+            // In worst case we have two slashes at the end (one from prefix, one from "/" lambda mount point)
+            while( (cfPath.length > 1) && (cfPath[ cfPath.length - 1 ] == '/') ){
+              cfPath = cfPath.substr( cfPath.length - 1 );
+            }
 
-              let event = {};
-              let prop;
+            let cfPathParts = cfPath.split( '/' );
+            cfPathParts = cfPathParts.map(function(part){
+              if( part.length > 0 ) {
+                if( (part[ 0 ] == '{') && (part[ part.length - 1 ] == '}') ) {
+                  return( ":" + part.substr( 1, part.length - 2 ) );
+                }
+              }
+              return( part );
+            });
+            if( process.env.DEBUG ) {
+              SCli.log( "Route: " + endpoint.method + " " + cfPath );
+            }
 
-              // Limited support for json input mapping
-              if (endpoint.requestTemplates && endpoint.requestTemplates['application/json']) {
-                let mappingKey;
-                let mappingValue;
-                let mappingResult;
-                for (mappingKey in endpoint.requestTemplates['application/json']) {
-                  mappingValue = endpoint.requestTemplates['application/json'][mappingKey];
-                  if (mappingResult = _this._processMapping(req,  mappingValue)) {
-                    try {
-                      event[ mappingKey ] = mappingResult;
-                    } catch (err) {
-                      SCli.log("Error processing input parameter '" + mappingValue + "':" + err);
+            _this.app[ endpoint.method.toLocaleLowerCase() ]( cfPathParts.join('/'), function(req, res, next){
+              SCli.log("Serving: " + endpoint.method + " " + cfPath);
+              let result = new BbPromise(function(resolve, reject) {
+
+                let event = {};
+                let prop;
+
+                // Limited support for json input mapping
+                if (endpoint.requestTemplates && endpoint.requestTemplates['application/json']) {
+                  let mappingKey;
+                  let mappingValue;
+                  let mappingResult;
+                  for (mappingKey in endpoint.requestTemplates['application/json']) {
+                    mappingValue = endpoint.requestTemplates['application/json'][mappingKey];
+                    if (mappingResult = _this._processMapping(req,  mappingValue)) {
+                      try {
+                        event[ mappingKey ] = mappingResult;
+                      } catch (e) {
+                        SCli.log("Error processing input parameter '" + mappingValue + "':" + e);
+                        throw e;
+                      }
+                    }
+                  }
+                  // If no template is supplied, map all inputs from the body, params and query
+                } else {
+                  for( prop in req.body ) {
+                    if( req.body.hasOwnProperty( prop ) ){
+                      event[ prop ] = req.body[ prop ];
+                    }
+                  }
+
+                  for( prop in req.params ) {
+                    if( req.params.hasOwnProperty( prop ) ){
+                      event[ prop ] = req.params[ prop ];
+                    }
+                  }
+
+                  for( prop in req.query ) {
+                    if( req.query.hasOwnProperty( prop ) ){
+                      event[ prop ] = req.query[ prop ];
                     }
                   }
                 }
-                // If no template is supplied, map all inputs from the body, params and query
-              } else {
-                for( prop in req.body ) {
-                  if( req.body.hasOwnProperty( prop ) ){
-                    event[ prop ] = req.body[ prop ];
+
+                if( !handler ) {
+                  try {
+                    handler = require( handlerPath )[handlerParts[1]];
+                  } catch( e ) {
+                    SCli.log( "Unable to load " + handlerPath + ": " + e );
+                    throw e ;
                   }
                 }
-
-                for( prop in req.params ) {
-                  if( req.params.hasOwnProperty( prop ) ){
-                    event[ prop ] = req.params[ prop ];
+                handler(event, context( fun.name, function(err, result) {
+                  if (err) {
+                    SCli.log(err);
+                    return reject(err);
                   }
-                }
+                  resolve(result);
+                }));
+              });
 
-                for( prop in req.query ) {
-                  if( req.query.hasOwnProperty( prop ) ){
-                    event[ prop ] = req.query[ prop ];
-                  }
-                }
-              }
-
-              if( !handler ) {
-                try {
-                  handler = require( handlerPath )[handlerParts[1]];
-                } catch( e ) {
-                  SCli.log( "Unable to load " + handlerPath + ": " + e );
-                  throw e ;
-                }
-              }
-              handler(event, context( fun.name, function(err, result) {
-                if (err) {
-                  SCli.log(err);
-                  return reject(err);
-                }
-                resolve(result);
-              }));
-            });
-
-            result.then(function(r){
-              res.send(r);
-            }, function(err){
-              SCli.log(err);
-              res.sendStatus(500);
-            });
-          } );
-        });
-      }
-    });
-  }
-
-  _processMapping(req, mapping) {
-    // Extract the type of mapping
-    let $input = new Input(req);
-    let inputRegexp = /\$input\.()/;
-    if (inputRegexp.test(mapping)) {
-      return eval(mapping);
-    } else {
-      return null;
-    }
-  }
-
-  _listen() {
-    let _this = this;
-
-    this.server = this.app.listen( this.evt.port, function(){
-      SCli.log( "Serverless API Gateway simulator listening on http://localhost:" + _this.evt.port );
-    });
-  }
-
-  serve(evt) {
-    let _this = this;
-
-    if (_this.S.cli) {
-      evt = JSON.parse(JSON.stringify(this.S.cli.options));
-      if (_this.S.cli.options.nonInteractive) _this.S._interactive = false
-    }
-
-    _this.evt = evt;
-
-    return this.S.init()
-      .bind(_this)
-      .then(_this._createApp)
-      .then(_this._registerLambdas)
-      .then(_this._tryInit)
-      .then(_this._listen)
-      .then(function() {
-        return _this.evt;
+              result.then(function(r){
+                res.send(r);
+              }, function(err){
+                SCli.log(err);
+                res.sendStatus(500);
+              });
+            } );
+          });
+        }
       });
-  }
-}
+    }
 
-class Input {
-
-  constructor(request) {
-    this.request = request;
-  }
-
-  params(param) {
-    if (param) {
-      return this.request.params[param] || this.request.query[param] || this.request.headers[param];
-    } else {
-      return {
-        headers: this.request.params,
-        querystring: this.request.query,
-        path: this.request.params
+    _processMapping(req, mapping) {
+      // Extract the type of mapping
+      let $input = new Input(req);
+      let inputRegexp = /\$input\.()/;
+      if (inputRegexp.test(mapping)) {
+        return eval(mapping);
+      } else {
+        return null;
       }
     }
-  }
 
-  json(path, asObject) {
-    asObject = asObject || false;
-    var jsonObject = JSONPath({path: path, json: this.request.body});
-    if (asObject) {
-      return jsonObject;
-    } else {
-      return JSON.stringify(jsonObject);
+    _listen() {
+      let _this = this;
+
+      this.server = this.app.listen( this.evt.port, function(){
+        SCli.log( "Serverless API Gateway simulator listening on http://localhost:" + _this.evt.port );
+      });
+    }
+
+    serve(evt) {
+      let _this = this;
+
+      if (_this.S.cli) {
+        evt = JSON.parse(JSON.stringify(this.S.cli.options));
+        if (_this.S.cli.options.nonInteractive) _this.S._interactive = false
+      }
+
+      _this.evt = evt;
+
+      return this.S.init()
+        .bind(_this)
+        .then(_this._createApp)
+        .then(_this._registerLambdas)
+        .then(_this._tryInit)
+        .then(_this._listen)
+        .then(function() {
+          return _this.evt;
+        });
     }
   }
 
-  path(path) {
-    return this.json(path, true);
-  }
-}
+  class Input {
 
-return Serve;
+    constructor(request) {
+      this.request = request;
+    }
+
+    params(param) {
+      if (param) {
+        return this.request.params[param] || this.request.query[param] || this.request.headers[param];
+      } else {
+        return {
+          headers: this.request.params,
+          querystring: this.request.query,
+          path: this.request.params
+        }
+      }
+    }
+
+    json(path, asObject) {
+      return JSONPath({path: path, json: this.request.body})[0];
+    }
+
+    path(path) {
+      throw new Error('Error: path input mapping is not supported');
+    }
+  }
+
+  return Serve;
 };
