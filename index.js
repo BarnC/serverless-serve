@@ -173,18 +173,24 @@ module.exports = function(ServerlessPlugin, serverlessPath) {
 
                 // Limited support for json input mapping
                 if (endpoint.requestTemplates && endpoint.requestTemplates['application/json']) {
+                  let map = endpoint.requestTemplates['application/json'];
                   let mappingKey;
                   let mappingValue;
                   let mappingResult;
-                  for (mappingKey in endpoint.requestTemplates['application/json']) {
-                    mappingValue = endpoint.requestTemplates['application/json'][mappingKey];
-                    if (mappingResult = _this._processMapping(req,  mappingValue)) {
-                      try {
-                        event[ mappingKey ] = mappingResult;
-                      } catch (e) {
-                        SCli.log("Error processing input parameter '" + mappingValue + "':" + e);
-                        throw e;
+
+                  if (typeof(map) === 'string') {
+                    let jsonReplace = /\$input.json\(.+?\)/;
+                    map = map.replace(jsonReplace, '\"$&\"');
+                    map = JSON.parse(map);
+                  }
+                  for (mappingKey in map) {
+                    mappingValue = map[mappingKey];
+                    try {
+                      if (mappingResult = _this._processMapping(req, mappingValue)) {
+                        event[mappingKey] = mappingResult;
                       }
+                    } catch (err) {
+                      SCli.log("Error processing input parameter '" + mappingValue + "':" + err);
                     }
                   }
                   // If no template is supplied, map all inputs from the body, params and query
@@ -296,12 +302,13 @@ module.exports = function(ServerlessPlugin, serverlessPath) {
       }
     }
 
-    json(path, asObject) {
-      return JSONPath({path: path, json: this.request.body})[0];
+    json(path) {
+      var jsonObject = JSONPath({path: path, json: this.request.body})[0]; // Return the first match of this jsonpath
+      return jsonObject;
     }
 
     path(path) {
-      throw new Error('Error: path input mapping is not supported');
+      throw new Error("path input mapping method has not been implemented");
     }
   }
 
