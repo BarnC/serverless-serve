@@ -179,7 +179,7 @@ module.exports = function(ServerlessPlugin, serverlessPath) {
                   let mappingResult;
 
                   if (typeof(map) === 'string') {
-                    let jsonReplace = /\$input.json\(.+?\)/;
+                    let jsonReplace = /\$input.json\(.+?\)/g;
                     map = map.replace(jsonReplace, '\"$&\"');
                     map = JSON.parse(map);
                   }
